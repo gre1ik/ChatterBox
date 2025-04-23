@@ -1,0 +1,222 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ChatterBox</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f4f6;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      text-align: center;
+      color: #4f46e5;
+    }
+    input, textarea, button {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+    button {
+      background-color: #4f46e5;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .logout-btn {
+      float: right;
+      margin-top: -40px;
+      background: #ef4444;
+    }
+    .post {
+      background: #f9fafb;
+      padding: 10px;
+      border-radius: 8px;
+      margin: 10px 0;
+    }
+    .post-author {
+      font-weight: bold;
+      color: #111827;
+    }
+    .post-content {
+      margin-top: 5px;
+    }
+    .post-image {
+      margin-top: 10px;
+      max-width: 100%;
+      border-radius: 8px;
+    }
+    .likes {
+      color: #ef4444;
+      margin-top: 10px;
+    }
+    .comments {
+      margin-top: 10px;
+      background: #e5e7eb;
+      padding: 5px;
+      border-radius: 5px;
+    }
+    .comment {
+      margin: 5px 0;
+    }
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      color: #6b7280;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="app">
+    <h1>ChatterBox</h1>
+    <div id="auth-section">
+      <input type="text" id="username" placeholder="Имя пользователя" />
+      <button onclick="login()">Войти</button>
+    </div>
+
+    <div id="main-section" style="display:none;">
+      <button class="logout-btn" onclick="logout()">Выйти</button>
+      <h2>Привет, <span id="user-display"></span>!</h2>
+      <textarea id="post-text" placeholder="Что у тебя нового?"></textarea>
+      <input type="file" id="post-image" accept="image/*" />
+      <button onclick="addPost()">Опубликовать</button>
+      <div id="feed"></div>
+    </div>
+  </div>
+
+  <footer>
+    Создатель: Григорий Бабаджанян
+  </footer>
+
+  <script>
+    const authSection = document.getElementById("auth-section");
+    const mainSection = document.getElementById("main-section");
+    const userDisplay = document.getElementById("user-display");
+    const feed = document.getElementById("feed");
+
+    function login() {
+      const username = document.getElementById("username").value.trim();
+      if (!username) return alert("Введите имя!");
+      localStorage.setItem("chatterbox_user", username);
+      showMain();
+    }
+
+    function logout() {
+      localStorage.removeItem("chatterbox_user");
+      location.reload();
+    }
+
+    function showMain() {
+      const user = localStorage.getItem("chatterbox_user");
+      if (user) {
+        authSection.style.display = "none";
+        mainSection.style.display = "block";
+        userDisplay.textContent = user;
+        loadFeed();
+      }
+    }
+
+    function addPost() {
+      const text = document.getElementById("post-text").value.trim();
+      const fileInput = document.getElementById("post-image");
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+
+      reader.onload = function () {
+        const imageData = file ? reader.result : null;
+        const posts = JSON.parse(localStorage.getItem("chatterbox_posts") || "[]");
+
+        posts.unshift({
+          id: Date.now(),
+          author: localStorage.getItem("chatterbox_user"),
+          content: text,
+          image: imageData,
+          time: new Date().toLocaleString(),
+          likes: 0,
+          comments: []
+        });
+
+        localStorage.setItem("chatterbox_posts", JSON.stringify(posts));
+        document.getElementById("post-text").value = "";
+        document.getElementById("post-image").value = "";
+        loadFeed();
+      };
+
+      if (file) {
+        reader.readAsDataURL(file);
+      } else {
+        reader.onload();
+      }
+    }
+
+    function likePost(id) {
+      const posts = JSON.parse(localStorage.getItem("chatterbox_posts") || "[]");
+      const post = posts.find(p => p.id === id);
+      if (post) {
+        post.likes += 1;
+        localStorage.setItem("chatterbox_posts", JSON.stringify(posts));
+        loadFeed();
+      }
+    }
+
+    function commentPost(id) {
+      const commentText = document.getElementById(`comment-${id}`).value.trim();
+      if (!commentText) return;
+      const posts = JSON.parse(localStorage.getItem("chatterbox_posts") || "[]");
+      const post = posts.find(p => p.id === id);
+      if (post) {
+        post.comments.push({
+          author: localStorage.getItem("chatterbox_user"),
+          text: commentText,
+          time: new Date().toLocaleTimeString()
+        });
+        localStorage.setItem("chatterbox_posts", JSON.stringify(posts));
+        loadFeed();
+      }
+    }
+
+    function loadFeed() {
+      const posts = JSON.parse(localStorage.getItem("chatterbox_posts") || "[]");
+      feed.innerHTML = "";
+      posts.forEach(post => {
+        const div = document.createElement("div");
+        div.className = "post";
+        div.innerHTML = `
+          <div class="post-author">${post.author}</div>
+          <div class="post-content">${post.content}</div>
+          ${post.image ? `<img class="post-image" src="${post.image}" />` : ""}
+          <div class="likes">
+            ❤️ ${post.likes} 
+            <button onclick="likePost(${post.id})">Лайк</button>
+          </div>
+          <div class="comments">
+            <strong>Комментарии:</strong>
+            ${post.comments.map(c => `<div class="comment"><b>${c.author}</b>: ${c.text} <span style="font-size:11px;color:#555;">(${c.time})</span></div>`).join("")}
+            <input type="text" id="comment-${post.id}" placeholder="Добавить комментарий..." />
+            <button onclick="commentPost(${post.id})">Отправить</button>
+          </div>
+          <div style="font-size: 12px; color: #6b7280; margin-top: 5px;">${post.time}</div>
+        `;
+        feed.appendChild(div);
+      });
+    }
+
+    showMain();
+  </script>
+</body>
+</html>
